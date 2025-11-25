@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Projeto Arduino - Código</title>
+
+    <style>
+        body {
+            background: #1e1e1e;
+            font-family: Consolas, monospace;
+            color: #fff;
+            padding: 30px;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 28px;
+        }
+
+        .code-box {
+            background: #111;
+            border-radius: 10px;
+            padding: 20px;
+            overflow-x: auto;
+            border: 1px solid #444;
+            box-shadow: 0 0 20px #000;
+        }
+
+        pre {
+            margin: 0;
+            font-size: 15px;
+            line-height: 1.4em;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Projeto: Sistema de Senha com Arduino</h1>
+
+<div class="code-box">
+<pre><code>
+#include &lt;Keypad.h&gt;
+#include &lt;LiquidCrystal.h&gt;
+#include &lt;Servo.h&gt;
+#include &lt;EEPROM.h&gt;
+
+LiquidCrystal lcd(12, 11, 10, 9, 8, 7);
+Servo servo;
+
+String senhaDigitada = "";
+String novaSenha = "";
+bool criandoSenha = false;
+
+bool senhaExiste() {
+  return EEPROM.read(0) == 1;
+}
+
+String lerSenha() {
+  String s = "";
+  for (int i = 1; i <= 4; i++) {
+    s += char(EEPROM.read(i));
+  }
+  return s;
+}
+
+void salvarSenha(String senha) {
+  EEPROM.write(0, 1);
+  for (int i = 1; i <= 4; i++) {
+    EEPROM.write(i, senha[i - 1]);
+  }
+}
+
+const byte ROWS = 4;
+const byte COLS = 4;
+char keys[ROWS][COLS] = {
+  {'1','2','3','A'},
+  {'4','5','6','B'},
+  {'7','8','9','C'},
+  {'*','0','#','D'}
+};
+
+byte rowPins[ROWS] = {5, 4, 3, 2};
+byte colPins[COLS] = {A3, A2, A1, A0};
+
+Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
+
+void setup() {
+  lcd.begin(16, 2);
+  servo.attach(6);
+
+  if (!senhaExiste()) {
+    criandoSenha = true;
+    lcd.print("Criar Senha:");
+    lcd.setCursor(0, 1);
+  } else {
+    lcd.print("Digite a senha:");
+    lcd.setCursor(0, 1);
+  }
+}
+
+void loop() {
+  char tecla = keypad.getKey();
+  if (tecla == NO_KEY) return;
+
+  if (tecla == '*') {
+    if (criandoSenha && novaSenha.length() > 0) {
+      novaSenha.remove(novaSenha.length() - 1);
+      lcd.setCursor(0, 1);
+      lcd.print("                ");
+      lcd.setCursor(0, 1);
+      lcd.print(novaSenha);
+      return;
+    }
+
+    if (!criandoSenha && senhaDigitada.length() > 0) {
+      senhaDigitada.remove(senhaDigitada.length() - 1);
+      lcd.setCursor(0, 1);
+      lcd.print("                ");
+      lcd.setCursor(0, 1);
+      lcd.print(senhaDigitada);
+      return;
+    }
+  }
+
+  if (tecla == 'A' && !criandoSenha) {
+    criandoSenha = true;
+    novaSenha = "";
+    lcd.clear();
+    lcd.print("Nova senha:");
+    lcd.setCursor(0, 1);
+    return;
+  }
+
+  if (!isdigit(tecla)) return;
+
+  if (criandoSenha) {
+    novaSenha += tecla;
+    lcd.setCursor(0, 1);
+    lcd.print(novaSenha);
+
+    if (novaSenha.length() == 4) {
+      salvarSenha(novaSenha);
+      lcd.clear();
+      lcd.print("Senha salva!");
+      delay(2000);
+
+      criandoSenha = false;
+      lcd.clear();
+      lcd.print("Digite a senha:");
+      lcd.setCursor(0, 1);
+    }
+    return;
+  }
+
+  senhaDigitada += tecla;
+  lcd.setCursor(0, 1);
+  lcd.print(senhaDigitada);
+
+  if (senhaDigitada.length() == 4) {
+    verificarSenha();
+  }
+}
+
+void verificarSenha() {
+  lcd.clear();
+  String senhaCorreta = lerSenha();
+
+  if (senhaDigitada == senhaCorreta) {
+    lcd.print("ACESSO LIBERADO");
+    servo.write(90);
+  } else {
+    lcd.print("SENHA ERRADA!");
+    servo.write(0);
+  }
+
+  delay(2000);
+  senhaDigitada = "";
+  lcd.clear();
+  lcd.print("Digite a senha:");
+  lcd.setCursor(0, 1);
+}
+</code></pre>
+</div>
+
+</body>
+</html>
